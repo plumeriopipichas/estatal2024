@@ -2,19 +2,22 @@ setwd("/home/FedericoYU/Documentos/Chamba/Olimpiada/Estatal 2024/estatal2024_Rpr
 
 library(dplyr)
 library(stringr)
+library(tools)
 
 source("funciones_adhoc.R")
 
 independientes<-
    read.csv("../listas_crudas/RegistrosIndependientes2024.csv",encoding = "UTF-8")%>%
    mutate(Sede=trimba(Sede))%>%
-   filter(Estatus%in%c("Completo","Acta","Enviado"))
+   filter(Estatus%in%c("Completo","Acta","Respondido","Vacio"))
  print("lista de sedes con registro independiente")
  print(unique(independientes$Sede))
  independientes$Escuela<-"Participante Independiente"
  independientes$Clave_escuela <- NA
  
 sedes_indy<-sort(unique(independientes$Sede))
+x<-which(sedes_indy>0)
+sedes_indy<-sedes_indy[x]
 
 indy_por_sede<-list()    #lista para bases de datos de independientes por sede, completos
 escuela_por_sede<-list() #lista para bases de datos de equipos de escuela por sede, completos
@@ -66,4 +69,57 @@ for (i in 1:length(sedes_indy)){
   }
 }
 
-rm(i,path,x,temp,checksede,aux,aux2,archivos)
+lista_general_registro <- juntar_bases(basica_sede)
+sedes<-names(basica_sede)
+
+# hacer las listas de asistencia desde las listas basicas
+
+asistencia<-list()
+
+for (i in sedes){
+  if (length ( names ( basica_sede [[i]] ) ) > 1) {
+    basica_sede[[i]] <- arrange(basica_sede[[i]],Nombre)
+    print(c('aseo',i))
+    for (nombre in c('Nombre','Primer_apellido','Segundo_apellido'))
+    {basica_sede[[i]][[nombre]]<-toTitleCase(tolower
+                                                   (basica_sede[[i]][[nombre]]))
+    basica_sede[[i]][[nombre]]<-limpiar(basica_sede[[i]][[nombre]])
+    }    
+    asistencia[[i]] <-select ( basica_sede[[i]], Nombre, Primer_apellido, Segundo_apellido,
+                               Escuela, clave,sede)
+    orden<-1:nrow(asistencia[[i]])
+    asistencia[[i]]<-cbind(orden,asistencia[[i]])
+  }
+}
+
+lista_general_registro <- juntar_bases(basica_sede)
+lista_general_registro$Escuela<-subte(lista_general_registro$Escuela)
+
+
+sedes<-names(basica_sede)
+
+#exportar algunas listas  de cada sede a un csv
+
+for (sede in sedes){
+  if ("Nombre"%in%names(basica_sede[[sede]])){
+    print(c("exportar listas de",sede))
+  }
+  path1 <- paste("../listas_generadas/lista_basica_",sede,".csv",sep="")
+  path2 <- paste("../listas_generadas/lista_asistencia_",sede,".csv",sep="")
+  
+  print(dim(basica_sede[[sede]]))
+  write.csv(basica_sede[[sede]],file = path1,row.names = FALSE)
+  write.csv(asistencia[[sede]],file = path2,row.names = FALSE)
+}
+
+### para revisar claves repetidas 
+temp<-group_by(lista_general_registro,clave)
+temp2<-reframe(temp,n())
+x<-which(temp2$`n()`>1)
+print(x)
+claves_repetidas <- temp2$clave[x]
+print(claves_repetidas)
+con_claves_repetidas <- filter(lista_general_registro, clave%in%claves_repetidas)
+########
+
+rm(i,path,x,temp,temp2,sede,aux,aux2,archivos)
